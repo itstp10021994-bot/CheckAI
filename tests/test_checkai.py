@@ -5,9 +5,10 @@ from fastapi.testclient import TestClient
 from PIL import Image, PngImagePlugin
 
 from checkai.api import app
+from checkai.documents import extract_text
 from checkai.image_detector import analyze_image
 from checkai.text_detector import analyze_text
-from samples import AI_VI, HUMAN_VI
+from samples import AI_VI, HUMAN_VI, make_pdf
 
 client = TestClient(app)
 
@@ -83,3 +84,50 @@ def test_api_rejects_bad_input():
 def test_index_and_health():
     assert "CheckAI" in client.get("/").text
     assert client.get("/api/health").json()["status"] == "ok"
+
+
+def _docx(paragraphs):
+    import docx
+
+    d = docx.Document()
+    for p in paragraphs:
+        d.add_paragraph(p)
+    d.core_properties.author = "Tester"
+    buf = io.BytesIO()
+    d.save(buf)
+    return buf.getvalue()
+
+
+def test_extract_docx_keeps_paragraphs_and_metadata():
+    text, meta = extract_text(_docx(AI_VI.split("\n\n")), "bai.docx")
+    assert text.count("\n\n") == AI_VI.count("\n\n")
+    assert meta["Tác giả"] == "Tester"
+    assert analyze_text(text).ai_probability > 65
+
+
+def test_extract_pdf_rejoins_wrapped_lines():
+    pdf = make_pdf([
+        "This is the first sentence of a paragraph that wraps across",
+        "two lines in the PDF file. A second sentence follows here and",
+        "also ends.",
+        "",
+        "New paragraph starts here.",
+    ])
+    text, meta = extract_text(pdf, "a.pdf")
+    assert "wraps across two lines" in text
+    assert meta["Số trang"] == "1"
+
+
+def test_extract_rejects_unsupported_and_scanned():
+    for data, name in [(b"x", "a.doc"), (b"x", "a.xlsx"), (make_pdf([]), "scan.pdf"), (b"junk", "a.pdf")]:
+        try:
+            extract_text(data, name)
+        except ValueError:
+            continue
+        raise AssertionError(name)
+
+
+def test_api_document():
+    r = client.post("/api/document", files={"file": ("bai.docx", _docx(AI_VI.split("\n\n")), "application/octet-stream")})
+    assert r.status_code == 200 and r.json()["meta"]["Tệp"] == "bai.docx"
+    assert client.post("/api/document", files={"file": ("a.doc", b"x", "application/msword")}).status_code == 400

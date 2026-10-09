@@ -59,6 +59,7 @@
 
   <div class="tabs">
     <button data-tab="text" class="on">Văn bản / Bài viết</button>
+    <button data-tab="doc">Tệp Word / PDF</button>
     <button data-tab="image">Hình ảnh</button>
   </div>
 
@@ -69,6 +70,14 @@
       <button class="go" id="go-text">Kiểm tra</button>
     </div>
     <div class="row muted" id="count">0 từ</div>
+  </section>
+
+  <section id="tab-doc" class="card hidden">
+    <label class="drop" id="ddrop">
+      <span id="ddrop-label">Kéo thả tệp vào đây hoặc bấm để chọn (.docx, .pdf, .txt, .md — tối đa 20MB)</span>
+      <input type="file" id="dfile" accept=".docx,.pdf,.txt,.md" hidden>
+    </label>
+    <div class="row"><button class="go" id="go-doc" disabled>Kiểm tra tệp</button></div>
   </section>
 
   <section id="tab-image" class="card hidden">
@@ -94,8 +103,7 @@ const color = (p) => p >= 65 ? "var(--ai)" : p >= 40 ? "var(--mix)" : "var(--hum
 
 document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
   document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
-  $("tab-text").classList.toggle("hidden", b.dataset.tab !== "text");
-  $("tab-image").classList.toggle("hidden", b.dataset.tab !== "image");
+  ["text", "doc", "image"].forEach(t => $("tab-" + t).classList.toggle("hidden", b.dataset.tab !== t));
   $("result").classList.add("hidden");
 });
 
@@ -137,6 +145,21 @@ drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); pick(e
 $("go-image").onclick = () => {
   const fd = new FormData(); fd.append("file", picked);
   call("/api/image", {method: "POST", body: fd}, $("go-image"));
+};
+
+let pickedDoc = null;
+function pickDoc(f) {
+  if (!f) return;
+  pickedDoc = f; $("go-doc").disabled = false; $("ddrop-label").textContent = f.name;
+}
+$("dfile").onchange = (e) => pickDoc(e.target.files[0]);
+const ddrop = $("ddrop");
+ddrop.ondragover = (e) => { e.preventDefault(); ddrop.classList.add("over"); };
+ddrop.ondragleave = () => ddrop.classList.remove("over");
+ddrop.ondrop = (e) => { e.preventDefault(); ddrop.classList.remove("over"); pickDoc(e.dataTransfer.files[0]); };
+$("go-doc").onclick = () => {
+  const fd = new FormData(); fd.append("file", pickedDoc);
+  call("/api/document", {method: "POST", body: fd}, $("go-doc"));
 };
 
 function render(r) {

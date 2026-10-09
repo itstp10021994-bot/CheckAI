@@ -8,6 +8,8 @@
 
 - **Văn bản / bài viết**: dán nội dung hoặc nhập URL bài viết (tự trích nội dung chính). Hỗ trợ tiếng Việt và tiếng Anh.
   Đánh dấu các câu có cụm từ đặc trưng của AI.
+- **Tệp Word / PDF**: tải lên `.docx`, `.pdf`, `.txt`, `.md` (tối đa 20MB) để trích nội dung và phân tích như văn bản.
+  PDF phải có lớp chữ (PDF ảnh scan chưa được hỗ trợ vì chưa có OCR); tệp `.doc` cũ cần lưu lại thành `.docx`.
 - **Hình ảnh**: tải ảnh lên (JPG, PNG, WEBP… tối đa 20MB). Đọc metadata (EXIF, PNG text, XMP/IPTC, C2PA) và phân tích điểm ảnh.
 - Mỗi kết quả gồm: **% khả năng do AI**, kết luận, độ tin cậy, và chi tiết từng dấu hiệu.
 
@@ -79,6 +81,7 @@ Với văn bản tiếng Việt, nên dùng một mô hình đa ngôn ngữ (ví
 ```bash
 curl -X POST localhost:8000/api/text -H 'Content-Type: application/json' -d '{"text": "..."}'
 curl -X POST localhost:8000/api/text -H 'Content-Type: application/json' -d '{"url": "https://..."}'
+curl -X POST localhost:8000/api/document -F file=@bai.docx   # hoặc .pdf
 curl -X POST localhost:8000/api/image -F file=@anh.jpg
 curl localhost:8000/api/health
 ```

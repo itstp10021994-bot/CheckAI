@@ -17,3 +17,31 @@ Nói chuyện một lúc thì nó kể chuyện vợ nó mới sinh em bé, con 
 Về đến nhà gần 11h đêm. Mưa. Quên áo mưa ở quán... thôi kệ, mai qua lấy.
 
 Nghĩ lại thấy thời gian trôi nhanh thật sự là nhanh, mới đó mà đã gần mười năm từ hồi tụi mình còn ngồi chép bài của nhau, trốn tiết đi net, bị cô chủ nhiệm gọi phụ huynh lên trường vì tội đánh nhau với lớp bên. Giờ mỗi đứa một nơi. Lâu lâu gặp lại thế này cũng vui nhé."""
+
+
+def make_pdf(lines: list[str]) -> bytes:
+    """PDF tối giản (font Helvetica, mỗi phần tử là một dòng) để test trích văn bản."""
+    ops = ["BT /F1 11 Tf 50 800 Td 14 TL"]
+    for ln in lines:
+        esc = ln.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        ops.append(f"({esc}) Tj T*")
+    ops.append("ET")
+    stream = "\n".join(ops).encode("latin-1")
+    objs = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+        b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = b"%PDF-1.4\n"
+    offsets = []
+    for i, o in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + o + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    out += b"".join(b"%010d 00000 n \n" % off for off in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    return out

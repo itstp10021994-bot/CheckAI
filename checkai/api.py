@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from . import __version__, providers
+from .documents import extract_text
 from .fetch import fetch_article
 from .image_detector import analyze_image
 from .text_detector import analyze_text
@@ -61,6 +62,20 @@ async def check_image(file: UploadFile = File(...)):
         return analyze_image(data, file.filename or "image").to_dict()
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
+
+
+@app.post("/api/document")
+async def check_document(file: UploadFile = File(...)):
+    data = await file.read(MAX_IMAGE_BYTES + 1)
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(413, "Tệp quá lớn (tối đa 20MB).")
+    try:
+        text, info = extract_text(data, file.filename or "")
+        result = analyze_text(text[:MAX_TEXT_CHARS])
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    result.meta.update(info)
+    return result.to_dict()
 
 
 @app.get("/")

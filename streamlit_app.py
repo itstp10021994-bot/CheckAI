@@ -18,6 +18,7 @@ except Exception:  # noqa: BLE001 - không có secrets.toml
     pass
 
 from checkai import providers  # noqa: E402
+from checkai.documents import extract_text  # noqa: E402
 from checkai.fetch import fetch_article  # noqa: E402
 from checkai.image_detector import analyze_image  # noqa: E402
 from checkai.scoring import Result  # noqa: E402
@@ -25,6 +26,7 @@ from checkai.text_detector import analyze_text  # noqa: E402
 
 MAX_TEXT_CHARS = 100_000
 MAX_IMAGE_MB = 20
+MAX_DOC_MB = 20
 
 st.set_page_config(page_title="CheckAI", page_icon="🔍", layout="centered")
 
@@ -84,7 +86,7 @@ def render(r: Result) -> None:
 st.title("🔍 CheckAI")
 st.caption("Ước lượng khả năng bài viết, nội dung hoặc hình ảnh được tạo bởi AI.")
 
-tab_text, tab_image = st.tabs(["📝 Văn bản / Bài viết", "🖼️ Hình ảnh"])
+tab_text, tab_doc, tab_image = st.tabs(["📝 Văn bản / Bài viết", "📄 Tệp Word / PDF", "🖼️ Hình ảnh"])
 
 with tab_text:
     text = st.text_area("Nội dung", height=240,
@@ -101,6 +103,24 @@ with tab_text:
                 if not text.strip():
                     raise ValueError("Vui lòng nhập văn bản hoặc URL bài viết.")
                 result = analyze_text(text[:MAX_TEXT_CHARS])
+            render(result)
+        except ValueError as e:
+            st.error(str(e))
+
+with tab_doc:
+    doc = st.file_uploader("Chọn tệp Word hoặc PDF", type=["docx", "pdf", "txt", "md"], key="doc")
+    st.caption("Hỗ trợ .docx, .pdf (có lớp chữ, không phải ảnh scan), .txt, .md — tối đa 20MB.")
+    if doc is not None and st.button("Kiểm tra tệp", type="primary", key="go_doc"):
+        try:
+            data = doc.getvalue()
+            if len(data) > MAX_DOC_MB * 1024 * 1024:
+                raise ValueError(f"Tệp quá lớn (tối đa {MAX_DOC_MB}MB).")
+            with st.spinner("Đang đọc tệp và phân tích..."):
+                content, info = extract_text(data, doc.name)
+                result = analyze_text(content[:MAX_TEXT_CHARS])
+                result.meta.update(info)
+            with st.expander(f"Nội dung trích từ tệp ({len(content)} ký tự)"):
+                st.write(content[:5000] + ("…" if len(content) > 5000 else ""))
             render(result)
         except ValueError as e:
             st.error(str(e))
