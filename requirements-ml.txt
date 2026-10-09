@@ -1,0 +1,4 @@
+# Tuỳ chọn: chạy mô hình phát hiện AI cục bộ (Hugging Face)
+-r requirements.txt
+transformers>=4.40
+torch>=2.2

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CheckAI</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --muted:#5f6b7a; --line:#e3e6ea;
+          --accent:#2f6fde; --ai:#d64545; --mix:#d99a1e; --human:#2e9d5b; --hl:#fde9b0; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171b; --card:#1d2127; --fg:#e7eaee; --muted:#9aa5b1; --line:#2d333b;
+            --accent:#6c9cf0; --hl:#5a4a14; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:880px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { margin:0 0 4px; font-size:26px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .tabs { display:flex; gap:8px; margin-bottom:12px; }
+  .tabs button { flex:1; padding:10px; border:1px solid var(--line); background:var(--card);
+                 color:var(--fg); border-radius:10px; cursor:pointer; font-size:15px; }
+  .tabs button.on { border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  textarea, input[type=url] { width:100%; border:1px solid var(--line); border-radius:8px; padding:10px;
+                 background:transparent; color:var(--fg); font:inherit; }
+  textarea { min-height:200px; resize:vertical; }
+  .row { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+  .go { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:10px 20px;
+        font-size:15px; cursor:pointer; }
+  .go:disabled { opacity:.6; cursor:wait; }
+  .drop { border:2px dashed var(--line); border-radius:10px; padding:28px; text-align:center;
+          color:var(--muted); cursor:pointer; }
+  .drop.over { border-color:var(--accent); }
+  .drop img { max-width:100%; max-height:320px; border-radius:8px; display:block; margin:0 auto 8px; }
+  .hidden { display:none; }
+  .score { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+  .gauge { width:140px; height:140px; border-radius:50%; display:grid; place-items:center; flex:none; }
+  .gauge div { width:110px; height:110px; border-radius:50%; background:var(--card); display:grid;
+               place-items:center; font-size:28px; font-weight:700; }
+  .verdict { font-size:20px; font-weight:600; }
+  .muted { color:var(--muted); }
+  .sig { display:grid; grid-template-columns:1fr 110px; gap:4px 12px; padding:10px 0; border-top:1px solid var(--line); }
+  .sig:first-child { border-top:0; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; align-self:center; }
+  .bar i { display:block; height:100%; }
+  .sig small { grid-column:1/-1; color:var(--muted); }
+  .tag { font-size:11px; padding:1px 6px; border-radius:4px; background:var(--line); margin-left:6px; }
+  mark { background:var(--hl); color:inherit; border-radius:3px; padding:0 2px; }
+  ul { padding-left:20px; margin:6px 0; }
+  .err { color:var(--ai); }
+  footer { color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>CheckAI</h1>
+  <p class="sub">Ước lượng khả năng bài viết, nội dung hoặc hình ảnh được tạo bởi AI.</p>
+
+  <div class="tabs">
+    <button data-tab="text" class="on">Văn bản / Bài viết</button>
+    <button data-tab="image">Hình ảnh</button>
+  </div>
+
+  <section id="tab-text" class="card">
+    <textarea id="text" placeholder="Dán nội dung bài viết vào đây (nên từ 150 từ trở lên)..."></textarea>
+    <div class="row">
+      <input type="url" id="url" placeholder="...hoặc nhập URL bài viết" style="flex:1;min-width:200px">
+      <button class="go" id="go-text">Kiểm tra</button>
+    </div>
+    <div class="row muted" id="count">0 từ</div>
+  </section>
+
+  <section id="tab-image" class="card hidden">
+    <label class="drop" id="drop">
+      <img id="preview" class="hidden" alt="">
+      <span id="drop-label">Kéo thả ảnh vào đây hoặc bấm để chọn (JPG, PNG, WEBP… tối đa 20MB)</span>
+      <input type="file" id="file" accept="image/*" hidden>
+    </label>
+    <div class="row"><button class="go" id="go-image" disabled>Kiểm tra ảnh</button></div>
+  </section>
+
+  <section id="result" class="hidden"></section>
+
+  <footer>
+    <p>Lưu ý: không công cụ nào phát hiện AI chính xác 100%. Kết quả là ước lượng xác suất,
+    không nên dùng làm bằng chứng duy nhất. <span id="det"></span></p>
+  </footer>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const color = (p) => p >= 65 ? "var(--ai)" : p >= 40 ? "var(--mix)" : "var(--human)";
+
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
+  $("tab-text").classList.toggle("hidden", b.dataset.tab !== "text");
+  $("tab-image").classList.toggle("hidden", b.dataset.tab !== "image");
+  $("result").classList.add("hidden");
+});
+
+$("text").oninput = () => {
+  const n = ($("text").value.match(/[\p{L}\p{N}]+/gu) || []).length;
+  $("count").textContent = n + " từ";
+};
+
+async function call(url, opts, btn) {
+  btn.disabled = true; const old = btn.textContent; btn.textContent = "Đang phân tích...";
+  try {
+    const r = await fetch(url, opts);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.statusText);
+    render(j);
+  } catch (e) {
+    $("result").className = "card";
+    $("result").innerHTML = `<p class="err">Lỗi: ${esc(e.message)}</p>`;
+  } finally { btn.disabled = false; btn.textContent = old; }
+}
+
+$("go-text").onclick = () => call("/api/text", {
+  method: "POST", headers: {"Content-Type": "application/json"},
+  body: JSON.stringify({text: $("text").value, url: $("url").value || null})
+}, $("go-text"));
+
+let picked = null;
+function pick(f) {
+  if (!f) return;
+  picked = f; $("go-image").disabled = false;
+  $("preview").src = URL.createObjectURL(f); $("preview").classList.remove("hidden");
+  $("drop-label").textContent = f.name;
+}
+$("file").onchange = (e) => pick(e.target.files[0]);
+const drop = $("drop");
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); pick(e.dataTransfer.files[0]); };
+$("go-image").onclick = () => {
+  const fd = new FormData(); fd.append("file", picked);
+  call("/api/image", {method: "POST", body: fd}, $("go-image"));
+};
+
+function render(r) {
+  const p = r.ai_probability, c = color(p);
+  const sigs = r.signals.map(s => {
+    const v = Math.round(s.score * 100);
+    const tag = s.source !== "heuristic" ? `<span class="tag">${esc(s.source)}</span>` : "";
+    return `<div class="sig"><span>${esc(s.name)}${tag}</span>
+      <div class="bar"><i style="width:${v}%;background:${color(v)}"></i></div>
+      <small>${v}% giống AI — ${esc(s.detail)}</small></div>`;
+  }).join("");
+  const hl = r.highlights.length ? `<div class="card"><b>Câu có dấu hiệu AI</b><ul>${
+    r.highlights.slice(0, 30).map(h => {
+      let t = esc(h.text);
+      h.reasons.forEach(w => { t = t.replace(new RegExp(esc(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), m => `<mark>${m}</mark>`); });
+      return `<li>${t}</li>`;
+    }).join("")}</ul></div>` : "";
+  const meta = Object.keys(r.meta || {}).length ? `<div class="card"><b>Thông tin</b><ul>${
+    Object.entries(r.meta).map(([k, v]) => `<li>${esc(k)}: ${esc(v)}</li>`).join("")}</ul></div>` : "";
+  const notes = r.notes.length ? `<ul class="muted">${r.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : "";
+  $("result").className = "";
+  $("result").innerHTML = `
+    <div class="card score">
+      <div class="gauge" style="background:conic-gradient(${c} ${p * 3.6}deg, var(--line) 0)"><div>${p}%</div></div>
+      <div><div class="verdict" style="color:${c}">${esc(r.verdict)}</div>
+        <div class="muted">Khả năng do AI tạo: <b>${p}%</b> · Độ tin cậy: <b>${esc(r.confidence)}</b></div>${notes}</div>
+    </div>
+    <div class="card"><b>Chi tiết các dấu hiệu</b>${sigs}</div>${hl}${meta}`;
+  $("result").scrollIntoView({behavior: "smooth"});
+}
+
+fetch("/api/health").then(r => r.json()).then(j => {
+  const d = j.detectors, on = [];
+  if (d.local_models) on.push("mô hình cục bộ");
+  if (d.sapling) on.push("Sapling");
+  if (d.sightengine) on.push("Sightengine");
+  $("det").textContent = on.length ? "Đang dùng thêm: " + on.join(", ") + "." : "Đang dùng chế độ heuristic (chưa bật mô hình/API).";
+}).catch(() => {});
+</script>
+</body>
+</html>
