@@ -17,7 +17,7 @@
 pip install -r requirements.txt
 streamlit run streamlit_app.py          # giao diện Streamlit, mở http://localhost:8501
 # hoặc bản web FastAPI + REST API:
-uvicorn checkai.api:app --reload        # mở http://localhost:8000
+pip install -r requirements-api.txt && uvicorn checkai.api:app --reload   # mở http://localhost:8000
 ```
 
 ## Deploy lên Streamlit Community Cloud

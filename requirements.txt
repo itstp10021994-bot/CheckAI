@@ -1,7 +1,3 @@
 streamlit>=1.40
 pillow>=10.0
 numpy>=1.26
-# Cho bản web FastAPI (checkai/api.py)
-fastapi>=0.110
-uvicorn[standard]>=0.29
-python-multipart>=0.0.9
