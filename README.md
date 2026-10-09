@@ -15,9 +15,26 @@
 
 ```bash
 pip install -r requirements.txt
-uvicorn checkai.api:app --reload
-# mở http://localhost:8000
+streamlit run streamlit_app.py          # giao diện Streamlit, mở http://localhost:8501
+# hoặc bản web FastAPI + REST API:
+uvicorn checkai.api:app --reload        # mở http://localhost:8000
 ```
+
+## Deploy lên Streamlit Community Cloud
+
+1. Đẩy code lên GitHub (repo này).
+2. Vào https://share.streamlit.io → **Create app** → chọn repo, nhánh, và **Main file path** = `streamlit_app.py`.
+3. Trong **Advanced settings** chọn Python 3.11 trở lên.
+4. (Tuỳ chọn) Dán khoá API vào mục **Secrets** theo mẫu `.streamlit/secrets.toml.example`:
+   ```toml
+   SAPLING_API_KEY = "..."
+   SIGHTENGINE_API_USER = "..."
+   SIGHTENGINE_API_SECRET = "..."
+   ```
+5. Bấm **Deploy**. Streamlit tự cài `requirements.txt`.
+
+> Không nên bật `CHECKAI_LOCAL_MODELS` trên gói miễn phí của Streamlit Cloud: `torch` + mô hình cần vài GB,
+> vượt giới hạn bộ nhớ (~1GB). Trên Streamlit Cloud hãy dùng API (Sapling, Sightengine) để tăng độ chính xác.
 
 Chạy test: `pip install -r requirements-dev.txt && pytest`
 
